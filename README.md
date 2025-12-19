@@ -40,3 +40,11 @@ To automatically enable it for all Markdown files, add it to your `markdown-mode
 ## How it works
 
 The package uses Emacs **overlays** to place graphics over the text. It utilizes **`cursor-sensor-mode`** to track point movement, ensuring that the underlying Markdown source code is always accessible for editing when you navigate to it.
+
+## License
+
+MIT License
+
+## Author (AI Disclosure)
+
+This package was created by Google Antigravity and Gemini 3.0 (Pro and Flash)

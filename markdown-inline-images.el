@@ -53,15 +53,19 @@
                         (when (file-exists-p full-path)
                           (create-image full-path nil nil :max-width 500)))))
             (when img
-              (let ((ov (make-overlay start end)))
+              (let* ((ov (make-overlay start end))
+                     ;; Extend sensor range by 1 to catch cursor at end-of-line
+                     (sensor-end (min (point-max) (1+ end)))
+                     (sov (make-overlay start sensor-end)))
                 (overlay-put ov 'markdown-inline-image t)
                 (overlay-put ov 'markdown-image-data img)
                 (overlay-put ov 'display img)
                 ;; we use cursor-sensor-functions to toggle the display
-                (overlay-put ov 'cursor-sensor-functions
+                (overlay-put sov 'cursor-sensor-functions
                              (list (lambda (_window _prev-pos state)
                                      (markdown-inline-images--update-overlay ov state))))
-                (push ov markdown-inline-images--overlays)))))))))
+                (push ov markdown-inline-images--overlays)
+                (push sov markdown-inline-images--overlays)))))))))
 
 ;;;###autoload
 (define-minor-mode markdown-inline-images-mode
