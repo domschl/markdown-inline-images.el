@@ -1,7 +1,7 @@
 ;;; markdown-inline-images.el --- Inline images for markdown-mode  -*- lexical-binding: t; -*-
 
 ;; Author: Antigravity
-;; Version: 0.1
+;; Version: 0.1.1
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: markdown, images
 
@@ -12,8 +12,6 @@
 ;; moves over the Markdown code for an image, the code is revealed.
 
 ;;; Code:
-
-;; Note: We do not need cursor-sensor anymore for this robust approach.
 
 (defgroup markdown-inline-images nil
   "Inline images for markdown-mode."

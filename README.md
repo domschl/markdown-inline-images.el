@@ -11,7 +11,6 @@
 ## Requirements
 
 - Emacs 26.1+
-- `cursor-sensor-mode` (built-in)
 
 ## Installation
 
@@ -39,7 +38,7 @@ To automatically enable it for all Markdown files, add it to your `markdown-mode
 
 ## How it works
 
-The package uses Emacs **overlays** to place graphics over the text. It utilizes **`cursor-sensor-mode`** to track point movement, ensuring that the underlying Markdown source code is always accessible for editing when you navigate to it.
+The package uses Emacs **overlays** to place graphics over the text. It uses a robust combination of **`post-command-hook`** and **`advice`** on `line-move` to ensure that images are always revealed when the cursor is on the same line, even when navigating purely visually through tall images.
 
 ## License
 
