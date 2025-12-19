@@ -13,7 +13,7 @@
 
 ;;; Code:
 
-(require 'cursor-sensor)
+;; Note: We do not need cursor-sensor anymore for this robust approach.
 
 (defgroup markdown-inline-images nil
   "Inline images for markdown-mode."
@@ -28,14 +28,45 @@
   (mapc #'delete-overlay markdown-inline-images--overlays)
   (setq markdown-inline-images--overlays nil))
 
-(defun markdown-inline-images--update-overlay (ov state)
-  "Update the display property of OV based on cursor sensor STATE."
-  (let ((img (overlay-get ov 'markdown-image-data)))
-    (overlay-put ov 'display (if (eq state 'entered) nil img))))
+(defun markdown-inline-images--sync-state ()
+  "Sync visibility of all images based on current point.
+Reveals images on the current line, hides others."
+  (when markdown-inline-images-mode
+    (dolist (ov markdown-inline-images--overlays)
+      (when (overlay-buffer ov) ;; check if overlay is still valid
+        (let* ((start (overlay-start ov))
+               (end (overlay-end ov))
+               ;; Determine logical line range dynamically
+               ;; We include the newline in the check so cursor at end of line (EOL) reveals it too.
+               (line-start (save-excursion (goto-char start) (line-beginning-position)))
+               (line-end (save-excursion (goto-char end) (1+ (line-end-position)))))
+          (if (and (>= (point) line-start) (< (point) line-end))
+              (overlay-put ov 'display nil) ;; Reveal source
+            (overlay-put ov 'display (overlay-get ov 'markdown-image-data)))))))) ;; Show image
+
+(defun markdown-inline-images--pre-line-move (arg &rest _args)
+  "Advice to reveal images on target line before `line-move' happens.
+This prevents visual-line navigation from getting stuck exploring tall images."
+  (when markdown-inline-images-mode
+    ;; 'arg' is the number of lines to move, default 1.
+    (let ((n (or arg 1)))
+      (save-excursion
+        ;; We attempt to move purely specifically to find the target line.
+        ;; Usage of forward-line (logical lines) moves past visuals instantly.
+        (when (zerop (forward-line n))
+          ;; We are now on the target line. Reveal known overlays here.
+          (let ((target-line-start (line-beginning-position))
+                (target-line-end (line-end-position)))
+             (dolist (ov markdown-inline-images--overlays)
+                (when (and (overlay-buffer ov)
+                           (<= (overlay-start ov) target-line-end)
+                           (>= (overlay-end ov) target-line-start))
+                  ;; Temporarily hide the image display so line-move lands on text.
+                  ;; The sync-state hook will confirm this state or revert it if we missed.
+                  (overlay-put ov 'display nil)))))))))
 
 (defun markdown-inline-images--refresh (&optional _beg _end _len)
-  "Scan the buffer for markdown images and create overlays.
-   Optional arguments BEG, END, and LEN are ignored (for hook compatibility)."
+  "Scan the buffer for markdown images and create overlays."
   (interactive)
   (when markdown-inline-images-mode
     (save-excursion
@@ -53,19 +84,11 @@
                         (when (file-exists-p full-path)
                           (create-image full-path nil nil :max-width 500)))))
             (when img
-              (let* ((ov (make-overlay start end))
-                     ;; Extend sensor range by 1 to catch cursor at end-of-line
-                     (sensor-end (min (point-max) (1+ end)))
-                     (sov (make-overlay start sensor-end)))
+              (let ((ov (make-overlay start end)))
                 (overlay-put ov 'markdown-inline-image t)
                 (overlay-put ov 'markdown-image-data img)
                 (overlay-put ov 'display img)
-                ;; we use cursor-sensor-functions to toggle the display
-                (overlay-put sov 'cursor-sensor-functions
-                             (list (lambda (_window _prev-pos state)
-                                     (markdown-inline-images--update-overlay ov state))))
-                (push ov markdown-inline-images--overlays)
-                (push sov markdown-inline-images--overlays)))))))))
+                (push ov markdown-inline-images--overlays)))))))))
 
 ;;;###autoload
 (define-minor-mode markdown-inline-images-mode
@@ -73,12 +96,14 @@
   :lighter " Img"
   (if markdown-inline-images-mode
       (progn
-        (cursor-sensor-mode 1)
+        (add-hook 'post-command-hook #'markdown-inline-images--sync-state nil t)
         (add-hook 'after-change-functions #'markdown-inline-images--refresh nil t)
+        (advice-add 'line-move :before #'markdown-inline-images--pre-line-move)
         (markdown-inline-images--refresh))
     (progn
-      (cursor-sensor-mode -1)
+      (remove-hook 'post-command-hook #'markdown-inline-images--sync-state t)
       (remove-hook 'after-change-functions #'markdown-inline-images--refresh t)
+      (advice-remove 'line-move #'markdown-inline-images--pre-line-move)
       (markdown-inline-images--clear-overlays))))
 
 (provide 'markdown-inline-images)
